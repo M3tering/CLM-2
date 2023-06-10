@@ -26,16 +26,17 @@ interface IM3tering {
         address from
     );
 
-    event Tariff(
+    event Setup(
         uint256 indexed timestamp,
         uint256 indexed id,
         uint256 indexed tariff,
+        address delegate,
         address from
     );
 
     function _switch(uint256 id, bool state) external;
 
-    function _tariff(uint256 id, uint256 tariff) external;
+    function _setup(uint256 id, uint256 tariff, address delegate) external;
 
     function _setRegistry(address registryAddress) external;
 

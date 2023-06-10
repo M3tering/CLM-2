@@ -18,7 +18,7 @@ contract M3tering is
 {
     // map id -> metadata
     mapping(uint256 => bool) private STATE;
-    mapping(uint256 => address) private PROVIDER;
+    mapping(uint256 => address) private DELEGATE;
     mapping(uint256 => uint256) private TARIFF;
 
     mapping(address => uint256) private REVENUE;
@@ -47,20 +47,21 @@ contract M3tering is
         M3terRegistry = registryAddress;
     }
 
-    // TODO: allow w3bstream, provider & owner to call
+    // TODO: allow w3bstream, delegate & owner to call
     function _switch(uint256 id, bool state) external onlyRole(W3BSTREAM_ROLE) {
         STATE[id] = state;
         emit Switch(block.timestamp, id, STATE[id], msg.sender);
     }
 
-    function _tariff(uint256 id, uint256 tariff) external {
-        // TODO: allow w3bstream, provider & owner to call
+    function _setup(uint256 id, uint256 tariff, address delegate) external {
+        // TODO: allow w3bstream, delegate & owner to call
         require(
             msg.sender == IM3ter(M3terRegistry).ownerOf(id),
             "M3tering: you aren't M3ter owner"
         );
         TARIFF[id] = tariff;
-        emit Tariff(block.timestamp, id, TARIFF[id], msg.sender);
+        DELEGATE[id] = delegate;
+        emit Setup(block.timestamp, id, TARIFF[id], DELEGATE[id], msg.sender);
     }
 
     function _setRegistry(
@@ -70,22 +71,22 @@ contract M3tering is
     }
 
     function pay(uint256 id) external payable whenNotPaused {
-        address provider = PROVIDER[id];
         address owner = IM3ter(M3terRegistry).ownerOf(id);
-        require(provider != address(0), "M3tering: invalid token ID");
-
-        uint x = (msg.value * 8) / 10;
-        uint y = msg.value - x;
-
-        REVENUE[owner] += x;
-        REVENUE[provider] += y;
+        if (DELEGATE[id] == address(0)) {
+            REVENUE[owner] += msg.value;
+        } else {
+            uint x = (msg.value * 8) / 10;
+            uint y = msg.value - x;
+            REVENUE[owner] += x;
+            REVENUE[DELEGATE[id]] += y;
+        }
 
         emit Revenue(msg.sender, msg.value, id, block.timestamp);
     }
 
     function claim() external whenNotPaused {
         uint256 amount = REVENUE[msg.sender];
-        require(amount <= uint256(0), "M3tering: no revenues to claim");
+        require(amount > uint256(0), "M3tering: no revenues to claim");
 
         REVENUE[msg.sender] = 0;
         (bool success, ) = payable(msg.sender).call{value: amount}("");
