@@ -18,7 +18,6 @@ contract M3tering is
 {
     // map id -> metadata
     mapping(uint256 => bool) private STATE;
-    mapping(uint256 => address) private DELEGATE;
     mapping(uint256 => uint256) private TARIFF;
 
     mapping(address => uint256) private REVENUE;
@@ -28,13 +27,15 @@ contract M3tering is
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
     address public M3terRegistry;
+    address M3terdelegate;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address registryAddress) public initializer {
+    function initialize(address registry) public initializer {
+        require(registry != address(0), "M3tering: can't register address(0)");
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -44,42 +45,39 @@ contract M3tering is
         _grantRole(UPGRADER_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
 
-        M3terRegistry = registryAddress;
+        M3terRegistry = registry;
+        M3terdelegate = msg.sender;
     }
 
-    // TODO: allow w3bstream, delegate & owner to call
+    function _setRegistry(address registry) external onlyRole(UPGRADER_ROLE) {
+        require(registry != address(0), "M3tering: can't register address(0)");
+        M3terRegistry = registry;
+    }
+
+    function _setDelegate(address delegate) external onlyRole(UPGRADER_ROLE) {
+        require(delegate != address(0), "M3tering: can't delegate address(0)");
+        M3terdelegate = delegate;
+    }
+
     function _switch(uint256 id, bool state) external onlyRole(W3BSTREAM_ROLE) {
         STATE[id] = state;
         emit Switch(block.timestamp, id, STATE[id], msg.sender);
     }
 
-    function _setup(uint256 id, uint256 tariff, address delegate) external {
-        // TODO: allow w3bstream, delegate & owner to call
-        require(
-            msg.sender == IM3ter(M3terRegistry).ownerOf(id),
-            "M3tering: you aren't M3ter owner"
-        );
+    function _setTariff(
+        uint256 id,
+        uint256 tariff
+    ) external onlyRole(W3BSTREAM_ROLE) {
         TARIFF[id] = tariff;
-        DELEGATE[id] = delegate;
-        emit Setup(block.timestamp, id, TARIFF[id], DELEGATE[id], msg.sender);
-    }
-
-    function _setRegistry(
-        address registryAddress
-    ) external onlyRole(UPGRADER_ROLE) {
-        M3terRegistry = registryAddress;
+        emit Tariff(block.timestamp, id, TARIFF[id], msg.sender);
     }
 
     function pay(uint256 id) external payable whenNotPaused {
-        address owner = IM3ter(M3terRegistry).ownerOf(id);
-        if (DELEGATE[id] == address(0)) {
-            REVENUE[owner] += msg.value;
-        } else {
-            uint x = (msg.value * 8) / 10;
-            uint y = msg.value - x;
-            REVENUE[owner] += x;
-            REVENUE[DELEGATE[id]] += y;
-        }
+        uint x = (msg.value * 8) / 10;
+        uint y = msg.value - x;
+
+        REVENUE[IM3ter(M3terRegistry).ownerOf(id)] += x;
+        REVENUE[M3terdelegate] += y;
 
         emit Revenue(msg.sender, msg.value, id, block.timestamp);
     }
