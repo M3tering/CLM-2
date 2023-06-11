@@ -7,10 +7,11 @@ interface IM3ter {
 
 interface IM3tering {
     event Revenue(
-        address from,
-        uint256 indexed amount,
         uint256 indexed id,
-        uint256 indexed timestamp
+        uint256 indexed amount,
+        uint256 indexed taffif,
+        address from,
+        uint256 timestamp
     );
 
     event Claim(
@@ -23,13 +24,6 @@ interface IM3tering {
         uint256 indexed timestamp,
         uint256 indexed id,
         bool indexed state,
-        address from
-    );
-
-    event Tariff(
-        uint256 indexed timestamp,
-        uint256 indexed id,
-        uint256 indexed tariff,
         address from
     );
 

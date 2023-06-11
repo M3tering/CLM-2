@@ -19,7 +19,6 @@ contract M3tering is
     // map id -> metadata
     mapping(uint256 => bool) private STATE;
     mapping(uint256 => uint256) private TARIFF;
-
     mapping(address => uint256) private REVENUE;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -64,12 +63,9 @@ contract M3tering is
         emit Switch(block.timestamp, id, STATE[id], msg.sender);
     }
 
-    function _setTariff(
-        uint256 id,
-        uint256 tariff
-    ) external onlyRole(W3BSTREAM_ROLE) {
+    function _setTariff(uint256 id, uint256 tariff) external {
+        require(msg.sender == M3terdelegate, "M3tering: not delegate address");
         TARIFF[id] = tariff;
-        emit Tariff(block.timestamp, id, TARIFF[id], msg.sender);
     }
 
     function pay(uint256 id) external payable whenNotPaused {
@@ -79,7 +75,7 @@ contract M3tering is
         REVENUE[IM3ter(M3terRegistry).ownerOf(id)] += x;
         REVENUE[M3terdelegate] += y;
 
-        emit Revenue(msg.sender, msg.value, id, block.timestamp);
+        emit Revenue(id, msg.value, TARIFF[id], msg.sender, block.timestamp);
     }
 
     function claim() external whenNotPaused {
