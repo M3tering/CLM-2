@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 
 import "./IM3tering.sol";
 
@@ -65,6 +66,7 @@ contract M3tering is
 
     function _setTariff(uint256 id, uint256 tariff) external {
         require(msg.sender == M3terdelegate, "M3tering: not delegate address");
+        require(tariff > uint256(0), "tariff can't be less than 1");
         TARIFF[id] = tariff;
     }
 
@@ -72,33 +74,36 @@ contract M3tering is
         uint x = (msg.value * 8) / 10;
         uint y = msg.value - x;
 
-        REVENUE[IM3ter(M3terRegistry).ownerOf(id)] += x;
+        REVENUE[IERC721Upgradeable(M3terRegistry).ownerOf(id)] += x;
         REVENUE[M3terdelegate] += y;
 
-        emit Revenue(id, msg.value, TARIFF[id], msg.sender, block.timestamp);
+        emit Revenue(id, msg.value, tariffOf(id), msg.sender, block.timestamp);
     }
 
     function claim() external whenNotPaused {
         uint256 amount = REVENUE[msg.sender];
-        require(amount > uint256(0), "M3tering: no revenues to claim");
+        if (amount > uint256(0)) {
+            REVENUE[msg.sender] = 0;
+            (bool success, ) = payable(msg.sender).call{value: amount}("");
+            require(success, "M3tering: revenue claim failed");
+            emit Claim(msg.sender, amount, block.timestamp);
+        }
+    }
 
-        REVENUE[msg.sender] = 0;
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        require(success, "M3tering: revenue claim failed");
-
-        emit Claim(msg.sender, amount, block.timestamp);
+    function revenueOf(address owner) external view returns (uint256) {
+        return REVENUE[owner];
     }
 
     function stateOf(uint256 id) external view returns (bool) {
         return STATE[id];
     }
 
-    function tariffOf(uint256 id) external view returns (uint256) {
-        return TARIFF[id];
-    }
-
-    function revenueOf(address owner) external view returns (uint256) {
-        return REVENUE[owner];
+    function tariffOf(uint256 id) public view returns (uint256) {
+        if (TARIFF[id] < uint256(1)) {
+            return uint256(1);
+        } else {
+            return TARIFF[id];
+        }
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {

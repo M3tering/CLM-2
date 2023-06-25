@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
-interface IM3ter {
-    function ownerOf(uint256 tokenId) external view returns (address);
-}
-
 interface IM3tering {
     event Revenue(
         uint256 indexed id,
