@@ -6,7 +6,9 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import "./IERCtokens.sol";
 import "./IM3tering.sol";
+import "./IMimo.sol";
 
 /// @custom:security-contact info@whynotswitch.com
 contract M3tering is
@@ -25,16 +27,18 @@ contract M3tering is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    uint8 public ioUSDTdecimals = 6;
-    IERC20 public ioUSDT = IERC20(0x6fbCdc1169B5130C59E72E51Ed68A84841C98cd1);
+    address public Cell;
     IERC721 public M3terRegistry;
+    IMimo public MimoRouter = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE);
+    IERC20 public ioUSDT = IERC20(0x6fbCdc1169B5130C59E72E51Ed68A84841C98cd1);
+    uint8 public ioUSDTdecimals = 6;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address registry) public initializer {
+    function initialize(address registry, address cell) public initializer {
         require(registry != address(0), "M3tering: can't register address(0)");
         __Pausable_init();
         __AccessControl_init();
@@ -46,6 +50,14 @@ contract M3tering is
         _grantRole(W3BSTREAM_ROLE, msg.sender);
 
         M3terRegistry = IERC721(registry);
+        Cell = cell;
+    }
+
+    function _swapPath() internal view returns (address[] memory) {
+        address[] memory path = new address[](2);
+        path[0] = address(ioUSDT);
+        path[1] = address(Cell);
+        return path;
     }
 
     function _setRegistry(address registry) external onlyRole(UPGRADER_ROLE) {
@@ -65,27 +77,49 @@ contract M3tering is
     }
 
     function pay(uint256 id, uint256 amount) external whenNotPaused {
-        uint256 value = amount * 10 ** ioUSDTdecimals;
-        REVENUE[M3terRegistry.ownerOf(id)] = value;
         require(
-            ioUSDT.transferFrom(msg.sender, address(this), value),
-            "M3tering: payment failed."
+            ioUSDT.transferFrom(
+                msg.sender,
+                address(this),
+                amount * 10 ** ioUSDTdecimals
+            ),
+            "M3tering: payment failed"
         );
-        emit Revenue(id, value, tariffOf(id), msg.sender, block.timestamp);
+        REVENUE[M3terRegistry.ownerOf(id)] = amount;
+        emit Revenue(id, amount, tariffOf(id), msg.sender, block.timestamp);
     }
 
-    function claim() external whenNotPaused {
-        uint256 amount = REVENUE[msg.sender];
-        if (amount > uint256(0)) {
-            REVENUE[msg.sender] = 0;
-            (bool success, ) = payable(msg.sender).call{value: amount}("");
-            require(success, "M3tering: revenue claim failed");
-            emit Claim(msg.sender, amount, block.timestamp);
-        }
+    function claim(uint256 amountOutMin) external whenNotPaused {
+        uint amountIn = REVENUE[msg.sender] * 10 ** ioUSDTdecimals;
+        require(amountIn > uint256(0), "M3tering: no revenue to claim");
+        require(
+            ioUSDT.approve(address(MimoRouter), amountIn),
+            "M3tering: failed to approve Mimo"
+        );
+
+        MimoRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            amountIn,
+            amountOutMin,
+            _swapPath(),
+            msg.sender,
+            block.timestamp
+        );
+
+        REVENUE[msg.sender] = 0;
+        emit Claim(msg.sender, amountIn, block.timestamp);
     }
 
-    function revenueOf(address owner) external view returns (uint256) {
-        return REVENUE[owner];
+    function revenueOf(
+        address owner
+    ) external view returns (uint256, uint256[] memory) {
+        uint revenue = REVENUE[owner];
+        return (
+            revenue,
+            MimoRouter.getAmountsOut(
+                revenue * 10 ** ioUSDTdecimals,
+                _swapPath()
+            )
+        );
     }
 
     function stateOf(uint256 id) external view returns (bool) {
