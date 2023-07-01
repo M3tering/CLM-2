@@ -5,7 +5,6 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 
 import "./IM3tering.sol";
 
@@ -26,8 +25,9 @@ contract M3tering is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    address public M3terRegistry;
-    address M3terdelegate;
+    uint8 public ioUSDTdecimals = 6;
+    IERC20 public ioUSDT = IERC20(0x6fbCdc1169B5130C59E72E51Ed68A84841C98cd1);
+    IERC721 public M3terRegistry;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -45,18 +45,12 @@ contract M3tering is
         _grantRole(UPGRADER_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
 
-        M3terRegistry = registry;
-        M3terdelegate = msg.sender;
+        M3terRegistry = IERC721(registry);
     }
 
     function _setRegistry(address registry) external onlyRole(UPGRADER_ROLE) {
         require(registry != address(0), "M3tering: can't register address(0)");
-        M3terRegistry = registry;
-    }
-
-    function _setDelegate(address delegate) external onlyRole(UPGRADER_ROLE) {
-        require(delegate != address(0), "M3tering: can't delegate address(0)");
-        M3terdelegate = delegate;
+        M3terRegistry = IERC721(registry);
     }
 
     function _switch(uint256 id, bool state) external onlyRole(W3BSTREAM_ROLE) {
@@ -65,19 +59,19 @@ contract M3tering is
     }
 
     function _setTariff(uint256 id, uint256 tariff) external {
-        require(msg.sender == M3terdelegate, "M3tering: not delegate address");
+        require(msg.sender == M3terRegistry.ownerOf(id), "M3tering: not owner");
         require(tariff > uint256(0), "tariff can't be less than 1");
         TARIFF[id] = tariff;
     }
 
-    function pay(uint256 id) external payable whenNotPaused {
-        uint x = (msg.value * 8) / 10;
-        uint y = msg.value - x;
-
-        REVENUE[IERC721Upgradeable(M3terRegistry).ownerOf(id)] += x;
-        REVENUE[M3terdelegate] += y;
-
-        emit Revenue(id, msg.value, tariffOf(id), msg.sender, block.timestamp);
+    function pay(uint256 id, uint256 amount) external whenNotPaused {
+        uint256 value = amount * 10 ** ioUSDTdecimals;
+        REVENUE[M3terRegistry.ownerOf(id)] = value;
+        require(
+            ioUSDT.transferFrom(msg.sender, address(this), value),
+            "M3tering: payment failed."
+        );
+        emit Revenue(id, value, tariffOf(id), msg.sender, block.timestamp);
     }
 
     function claim() external whenNotPaused {

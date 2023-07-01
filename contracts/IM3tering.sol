@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
+interface IERC20 {
+    function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+    ) external returns (bool success);
+}
+
+interface IERC721 {
+    function ownerOf(uint256 _tokenId) external view returns (address);
+}
+
 interface IM3tering {
     event Revenue(
         uint256 indexed id,
@@ -25,13 +37,11 @@ interface IM3tering {
 
     function _setRegistry(address registryAddress) external;
 
-    function _setDelegate(address delegate) external;
-
     function _switch(uint256 id, bool state) external;
 
     function _setTariff(uint256 id, uint256 tariff) external;
 
-    function pay(uint256 id) external payable;
+    function pay(uint256 id, uint256 amount) external;
 
     function claim() external;
 
