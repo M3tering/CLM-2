@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
-interface IERC20 {
+interface ERC20 {
     function transferFrom(
         address _from,
         address _to,
@@ -14,6 +14,6 @@ interface IERC20 {
     ) external returns (bool success);
 }
 
-interface IERC721 {
+interface ERC721 {
     function ownerOf(uint256 _tokenId) external view returns (address);
 }

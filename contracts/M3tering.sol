@@ -27,11 +27,11 @@ contract M3tering is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    address public Cell;
-    IERC721 public M3terRegistry;
+    address public CELL;
+    ERC721 public M3terRegistry;
     IMimo public MimoRouter = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE);
-    IERC20 public ioUSDT = IERC20(0x6fbCdc1169B5130C59E72E51Ed68A84841C98cd1);
-    uint8 public ioUSDTdecimals = 6;
+    ERC20 public DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
+    uint8 public DAIdecimals = 18;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -49,20 +49,20 @@ contract M3tering is
         _grantRole(UPGRADER_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
 
-        M3terRegistry = IERC721(registry);
-        Cell = cell;
+        M3terRegistry = ERC721(registry);
+        CELL = cell;
     }
 
     function _swapPath() internal view returns (address[] memory) {
         address[] memory path = new address[](2);
-        path[0] = address(ioUSDT);
-        path[1] = address(Cell);
+        path[0] = address(DAI);
+        path[1] = address(CELL);
         return path;
     }
 
     function _setRegistry(address registry) external onlyRole(UPGRADER_ROLE) {
         require(registry != address(0), "M3tering: can't register address(0)");
-        M3terRegistry = IERC721(registry);
+        M3terRegistry = ERC721(registry);
     }
 
     function _switch(uint256 id, bool state) external onlyRole(W3BSTREAM_ROLE) {
@@ -78,10 +78,10 @@ contract M3tering is
 
     function pay(uint256 id, uint256 amount) external whenNotPaused {
         require(
-            ioUSDT.transferFrom(
+            DAI.transferFrom(
                 msg.sender,
                 address(this),
-                amount * 10 ** ioUSDTdecimals
+                amount * 10 ** DAIdecimals
             ),
             "M3tering: payment failed"
         );
@@ -90,10 +90,10 @@ contract M3tering is
     }
 
     function claim(uint256 amountOutMin) external whenNotPaused {
-        uint amountIn = REVENUE[msg.sender] * 10 ** ioUSDTdecimals;
+        uint amountIn = REVENUE[msg.sender] * 10 ** DAIdecimals;
         require(amountIn > uint256(0), "M3tering: no revenue to claim");
         require(
-            ioUSDT.approve(address(MimoRouter), amountIn),
+            DAI.approve(address(MimoRouter), amountIn),
             "M3tering: failed to approve Mimo"
         );
 
@@ -115,10 +115,7 @@ contract M3tering is
         uint revenue = REVENUE[owner];
         return (
             revenue,
-            MimoRouter.getAmountsOut(
-                revenue * 10 ** ioUSDTdecimals,
-                _swapPath()
-            )
+            MimoRouter.getAmountsOut(revenue * 10 ** DAIdecimals, _swapPath())
         );
     }
 
