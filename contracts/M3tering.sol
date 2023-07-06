@@ -27,11 +27,11 @@ contract M3tering is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
+    ERC20 public DAI;
     address public CELL;
+    IMimo public MimoRouter;
     ERC721 public M3terRegistry;
-    IMimo public MimoRouter = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE);
-    ERC20 public DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
-    uint8 public DAIdecimals = 18;
+    uint8 public DAIdecimals;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -49,8 +49,12 @@ contract M3tering is
         _grantRole(UPGRADER_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
 
+        DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
+        MimoRouter = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE);
         M3terRegistry = ERC721(registry);
+        DAIdecimals = 18;
         CELL = cell;
+
     }
 
     function _swapPath() internal view returns (address[] memory) {
