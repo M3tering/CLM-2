@@ -19,27 +19,35 @@ contract M3tering is
     UUPSUpgradeable
 {
     // map id -> metadata
-    mapping(uint256 => bool) private STATE;
-    mapping(uint256 => uint256) private TARIFF;
-    mapping(address => uint256) private REVENUE;
+    struct State {
+        bool state;
+        uint248 tariff; 
+    /* tariff is a USD denominated floating point number
+        where the last 3 digits repressent decimal values
+        -------------------------------------------------
+        ie   #1240 -->  1240 / 10 ** 3  -->  $1.240
+    */
+    }
+
+    mapping(bytes32 => State) STATES;
+    mapping(address => uint) REVENUE;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    ERC20 public DAI;
-    address public CELL;
-    IMimo public MimoRouter;
-    ERC721 public M3terRegistry;
-    uint8 public DAIdecimals;
+    uint public constant DAI_BASE_UNITS = 10 ** 18;
+    ERC721 public constant M3terRegistry = ERC721(address(0)); // TODO: set address
+    ERC20 public constant DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
+    IMimo public constant MIMO = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
+    address public constant CELL = address(0); // TODO: set address
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address registry, address cell) public initializer {
-        require(registry != address(0), "M3tering: can't register address(0)");
+    function initialize() public initializer {
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -48,60 +56,52 @@ contract M3tering is
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
-
-        DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
-        MimoRouter = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE);
-        M3terRegistry = ERC721(registry);
-        DAIdecimals = 18;
-        CELL = cell;
-
     }
 
-    function _swapPath() internal view returns (address[] memory) {
+    function _M3terOwner(bytes32 id) internal view returns (address) {
+        return M3terRegistry.ownerOf(uint(id));
+    }
+
+    function _swapPath() internal pure returns (address[] memory) {
         address[] memory path = new address[](2);
         path[0] = address(DAI);
         path[1] = address(CELL);
         return path;
     }
 
-    function _setRegistry(address registry) external onlyRole(UPGRADER_ROLE) {
-        require(registry != address(0), "M3tering: can't register address(0)");
-        M3terRegistry = ERC721(registry);
+    function _switch(bytes32 id, bool state) external onlyRole(W3BSTREAM_ROLE) {
+        STATES[id].state = state;
+        emit Switch(id, state, block.timestamp, msg.sender);
     }
 
-    function _switch(uint256 id, bool state) external onlyRole(W3BSTREAM_ROLE) {
-        STATE[id] = state;
-        emit Switch(block.timestamp, id, STATE[id], msg.sender);
+    function _setTariff(bytes32 id, uint tariff) external {
+        require(msg.sender == _M3terOwner(id), "M3tering: not owner");
+        require(tariff > 0, "M3tering: tariff can't be less than 1");
+        STATES[id].tariff = uint248(tariff);
     }
 
-    function _setTariff(uint256 id, uint256 tariff) external {
-        require(msg.sender == M3terRegistry.ownerOf(id), "M3tering: not owner");
-        require(tariff > uint256(0), "tariff can't be less than 1");
-        TARIFF[id] = tariff;
-    }
-
-    function pay(uint256 id, uint256 amount) external whenNotPaused {
+    function pay(bytes32 id, uint amount) external whenNotPaused {
         require(
             DAI.transferFrom(
                 msg.sender,
                 address(this),
-                amount * 10 ** DAIdecimals
+                amount * DAI_BASE_UNITS
             ),
             "M3tering: payment failed"
         );
-        REVENUE[M3terRegistry.ownerOf(id)] = amount;
+        REVENUE[_M3terOwner(id)] = amount;
         emit Revenue(id, amount, tariffOf(id), msg.sender, block.timestamp);
     }
 
-    function claim(uint256 amountOutMin) external whenNotPaused {
-        uint amountIn = REVENUE[msg.sender] * 10 ** DAIdecimals;
-        require(amountIn > uint256(0), "M3tering: no revenue to claim");
+    function claim(uint amountOutMin) external whenNotPaused {
+        uint amountIn = REVENUE[msg.sender] * DAI_BASE_UNITS;
+        require(amountIn > uint(0), "M3tering: no revenue to claim");
         require(
-            DAI.approve(address(MimoRouter), amountIn),
+            DAI.approve(address(MIMO), amountIn),
             "M3tering: failed to approve Mimo"
         );
 
-        MimoRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        MIMO.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn,
             amountOutMin,
             _swapPath(),
@@ -115,23 +115,23 @@ contract M3tering is
 
     function revenueOf(
         address owner
-    ) external view returns (uint256, uint256[] memory) {
+    ) external view returns (uint, uint[] memory) {
         uint revenue = REVENUE[owner];
         return (
             revenue,
-            MimoRouter.getAmountsOut(revenue * 10 ** DAIdecimals, _swapPath())
+            MIMO.getAmountsOut(revenue * DAI_BASE_UNITS, _swapPath())
         );
     }
 
-    function stateOf(uint256 id) external view returns (bool) {
-        return STATE[id];
+    function stateOf(bytes32 id) external view returns (bool) {
+        return STATES[id].state;
     }
 
-    function tariffOf(uint256 id) public view returns (uint256) {
-        if (TARIFF[id] < uint256(1)) {
-            return uint256(1);
+    function tariffOf(bytes32 id) public view returns (uint) {
+        if (STATES[id].tariff < uint(1)) {
+            return uint(1);
         } else {
-            return TARIFF[id];
+            return STATES[id].tariff;
         }
     }
 
