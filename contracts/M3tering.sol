@@ -18,28 +18,20 @@ contract M3tering is
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
-    // map id -> metadata
-    struct State {
-        bool state;
-        uint248 tariff; 
-    /* tariff is a USD denominated floating point number
-        where the last 3 digits repressent decimal values
-        -------------------------------------------------
-        ie   #1240 -->  1240 / 10 ** 3  -->  $1.240
-    */
-    }
 
-    mapping(bytes32 => State) STATES;
+    mapping(uint256 => State) STATES;
     mapping(address => uint) REVENUE;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    uint public constant DAI_BASE_UNITS = 10 ** 18;
+    uint256 public constant DAI_BASE_UNITS = 10 ** 18;
     ERC721 public constant M3terRegistry = ERC721(address(0)); // TODO: set address
-    ERC20 public constant DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
-    IMimo public constant MIMO = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
+    ERC20 public constant DAI =
+        ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
+    IMimo public constant MIMO =
+        IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
     address public constant CELL = address(0); // TODO: set address
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -58,8 +50,8 @@ contract M3tering is
         _grantRole(W3BSTREAM_ROLE, msg.sender);
     }
 
-    function _M3terOwner(bytes32 id) internal view returns (address) {
-        return M3terRegistry.ownerOf(uint(id));
+    function _M3terOwner(uint256 tokenId) internal view returns (address) {
+        return M3terRegistry.ownerOf(uint(tokenId));
     }
 
     function _swapPath() internal pure returns (address[] memory) {
@@ -69,18 +61,21 @@ contract M3tering is
         return path;
     }
 
-    function _switch(bytes32 id, bool state) external onlyRole(W3BSTREAM_ROLE) {
-        STATES[id].state = state;
-        emit Switch(id, state, block.timestamp, msg.sender);
+    function _switch(
+        uint256 tokenId,
+        bool state
+    ) external onlyRole(W3BSTREAM_ROLE) {
+        STATES[tokenId].state = state;
+        emit Switch(tokenId, state, block.timestamp, msg.sender);
     }
 
-    function _setTariff(bytes32 id, uint tariff) external {
-        require(msg.sender == _M3terOwner(id), "M3tering: not owner");
+    function _setTariff(uint256 tokenId, uint256 tariff) external {
+        require(msg.sender == _M3terOwner(tokenId), "M3tering: not owner");
         require(tariff > 0, "M3tering: tariff can't be less than 1");
-        STATES[id].tariff = uint248(tariff);
+        STATES[tokenId].tariff = uint248(tariff);
     }
 
-    function pay(bytes32 id, uint amount) external whenNotPaused {
+    function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
         require(
             DAI.transferFrom(
                 msg.sender,
@@ -89,12 +84,18 @@ contract M3tering is
             ),
             "M3tering: payment failed"
         );
-        REVENUE[_M3terOwner(id)] = amount;
-        emit Revenue(id, amount, tariffOf(id), msg.sender, block.timestamp);
+        REVENUE[_M3terOwner(tokenId)] = amount;
+        emit Revenue(
+            tokenId,
+            amount,
+            tariffOf(tokenId),
+            msg.sender,
+            block.timestamp
+        );
     }
 
-    function claim(uint amountOutMin) external whenNotPaused {
-        uint amountIn = REVENUE[msg.sender] * DAI_BASE_UNITS;
+    function claim(uint256 amountOutMin) external whenNotPaused {
+        uint256 amountIn = REVENUE[msg.sender] * DAI_BASE_UNITS;
         require(amountIn > uint(0), "M3tering: no revenue to claim");
         require(
             DAI.approve(address(MIMO), amountIn),
@@ -116,22 +117,22 @@ contract M3tering is
     function revenueOf(
         address owner
     ) external view returns (uint, uint[] memory) {
-        uint revenue = REVENUE[owner];
+        uint256 revenue = REVENUE[owner];
         return (
             revenue,
             MIMO.getAmountsOut(revenue * DAI_BASE_UNITS, _swapPath())
         );
     }
 
-    function stateOf(bytes32 id) external view returns (bool) {
-        return STATES[id].state;
+    function stateOf(uint256 tokenId) external view returns (bool) {
+        return STATES[tokenId].state;
     }
 
-    function tariffOf(bytes32 id) public view returns (uint) {
-        if (STATES[id].tariff < uint(1)) {
+    function tariffOf(uint256 tokenId) public view returns (uint) {
+        if (STATES[tokenId].tariff < uint(1)) {
             return uint(1);
         } else {
-            return STATES[id].tariff;
+            return STATES[tokenId].tariff;
         }
     }
 
