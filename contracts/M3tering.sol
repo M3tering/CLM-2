@@ -25,7 +25,6 @@ contract M3tering is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    uint256 public constant DAI_BASE_UNITS = 10 ** 18;
     ERC721 public constant M3terRegistry = ERC721(address(0)); // TODO: set address
     ERC20 public constant DAI =
         ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
@@ -76,11 +75,7 @@ contract M3tering is
 
     function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
         require(
-            DAI.transferFrom(
-                msg.sender,
-                address(this),
-                amount * DAI_BASE_UNITS
-            ),
+            DAI.transferFrom(msg.sender, address(this), amount),
             "M3tering: payment failed"
         );
         REVENUE[_M3terOwner(tokenId)] = amount;
@@ -97,7 +92,7 @@ contract M3tering is
         uint256 amountOutMin,
         uint256 deadline
     ) external whenNotPaused {
-        uint256 amountIn = REVENUE[msg.sender] * DAI_BASE_UNITS;
+        uint256 amountIn = REVENUE[msg.sender];
         require(amountIn > uint(0), "M3tering: no revenue to claim");
         require(
             DAI.approve(address(MIMO), amountIn),
@@ -120,10 +115,7 @@ contract M3tering is
         address owner
     ) external view returns (uint, uint[] memory) {
         uint256 revenue = REVENUE[owner];
-        return (
-            revenue,
-            MIMO.getAmountsOut(revenue * DAI_BASE_UNITS, _swapPath())
-        );
+        return (revenue, MIMO.getAmountsOut(revenue, _swapPath()));
     }
 
     function stateOf(uint256 tokenId) external view returns (bool) {
