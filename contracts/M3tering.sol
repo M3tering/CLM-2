@@ -18,7 +18,6 @@ contract M3tering is
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
-
     mapping(uint256 => State) STATES;
     mapping(address => uint) REVENUE;
 
@@ -94,7 +93,10 @@ contract M3tering is
         );
     }
 
-    function claim(uint256 amountOutMin) external whenNotPaused {
+    function claim(
+        uint256 amountOutMin,
+        uint256 deadline
+    ) external whenNotPaused {
         uint256 amountIn = REVENUE[msg.sender] * DAI_BASE_UNITS;
         require(amountIn > uint(0), "M3tering: no revenue to claim");
         require(
@@ -107,7 +109,7 @@ contract M3tering is
             amountOutMin,
             _swapPath(),
             msg.sender,
-            block.timestamp
+            deadline
         );
 
         REVENUE[msg.sender] = 0;
