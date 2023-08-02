@@ -35,11 +35,9 @@ interface IM3tering {
 
     function pay(uint256 tokenId, uint256 amount) external;
 
-    function claim(uint256 amountOutMin) external;
+    function claim(uint256 amountOutMi, uint256 deadline) external;
 
-    function revenueOf(
-        address owner
-    ) external view returns (uint, uint[] memory);
+    function revenueOf(address owner) external view returns (uint256[] memory);
 
     function stateOf(uint256 tokenId) external view returns (bool);
 

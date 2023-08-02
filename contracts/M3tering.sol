@@ -19,7 +19,7 @@ contract M3tering is
     UUPSUpgradeable
 {
     mapping(uint256 => State) STATES;
-    mapping(address => uint) REVENUE;
+    mapping(address => uint256) REVENUE;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -49,7 +49,7 @@ contract M3tering is
     }
 
     function _M3terOwner(uint256 tokenId) internal view returns (address) {
-        return M3terRegistry.ownerOf(uint(tokenId));
+        return M3terRegistry.ownerOf(uint256(tokenId));
     }
 
     function _swapPath() internal pure returns (address[] memory) {
@@ -93,7 +93,7 @@ contract M3tering is
         uint256 deadline
     ) external whenNotPaused {
         uint256 amountIn = REVENUE[msg.sender];
-        require(amountIn > uint(0), "M3tering: no revenue to claim");
+        require(amountIn > 0, "M3tering: no revenue to claim");
         require(
             DAI.approve(address(MIMO), amountIn),
             "M3tering: failed to approve Mimo"
@@ -111,20 +111,17 @@ contract M3tering is
         emit Claim(msg.sender, amountIn, block.timestamp);
     }
 
-    function revenueOf(
-        address owner
-    ) external view returns (uint, uint[] memory) {
-        uint256 revenue = REVENUE[owner];
-        return (revenue, MIMO.getAmountsOut(revenue, _swapPath()));
+    function revenueOf(address owner) external view returns (uint256[] memory) {
+        return (MIMO.getAmountsOut(REVENUE[owner], _swapPath()));
     }
 
     function stateOf(uint256 tokenId) external view returns (bool) {
         return STATES[tokenId].state;
     }
 
-    function tariffOf(uint256 tokenId) public view returns (uint) {
-        if (STATES[tokenId].tariff < uint(1)) {
-            return uint(1);
+    function tariffOf(uint256 tokenId) public view returns (uint256) {
+        if (STATES[tokenId].tariff < 1) {
+            return 1;
         } else {
             return STATES[tokenId].tariff;
         }
