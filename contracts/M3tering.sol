@@ -1,23 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 import "./IERCtokens.sol";
 import "./IM3tering.sol";
 import "./IMimo.sol";
 
 /// @custom:security-contact info@whynotswitch.com
-contract M3tering is
-    IM3tering,
-    Initializable,
-    PausableUpgradeable,
-    AccessControlUpgradeable,
-    UUPSUpgradeable
-{
+contract M3tering is IM3tering, Pausable, AccessControl {
     mapping(uint256 => State) STATES;
     mapping(address => uint256) REVENUE;
 
@@ -31,21 +23,14 @@ contract M3tering is
     IMimo public constant MIMO =
         IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
     address public constant CELL = address(0); // TODO: set address
+    address public FeeAddress;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers();
-    }
-
-    function initialize() public initializer {
-        __Pausable_init();
-        __AccessControl_init();
-        __UUPSUpgradeable_init();
-
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(UPGRADER_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        FeeAddress = msg.sender;
     }
 
     function _M3terOwner(uint256 tokenId) internal view returns (address) {
@@ -67,18 +52,29 @@ contract M3tering is
         emit Switch(tokenId, state, block.timestamp, msg.sender);
     }
 
+    function _setFeeAddress(
+        address otherAddress
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        FeeAddress = otherAddress;
+    }
+
     function _setTariff(uint256 tokenId, uint256 tariff) external {
-        require(msg.sender == _M3terOwner(tokenId), "M3tering: not owner");
-        require(tariff > 0, "M3tering: tariff can't be less than 1");
+        if (msg.sender != _M3terOwner(tokenId)) {
+            revert Unauthorized();
+        }
+        if (tariff < 1) {
+            revert InputIsZero();
+        }
         STATES[tokenId].tariff = uint248(tariff);
     }
 
     function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
-        require(
-            DAI.transferFrom(msg.sender, address(this), amount),
-            "M3tering: payment failed"
-        );
-        REVENUE[_M3terOwner(tokenId)] = amount;
+        if (!DAI.transferFrom(msg.sender, address(this), amount)) {
+            revert TransferError();
+        }
+        uint256 fee = (amount * 3) / 1000;
+        REVENUE[_M3terOwner(tokenId)] = amount - fee;
+        REVENUE[FeeAddress] = fee;
         emit Revenue(
             tokenId,
             amount,
@@ -134,8 +130,4 @@ contract M3tering is
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
     }
-
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyRole(UPGRADER_ROLE) {}
 }
