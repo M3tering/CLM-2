@@ -17,10 +17,8 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    ERC20 public constant DAI =
-        ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
-    IMimo public constant MIMO =
-        IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
+    ERC20 public constant DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
+    IMimo public constant MIMO = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
     address public feeAddress;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -31,17 +29,12 @@ contract M3tering is IM3tering, Pausable, AccessControl {
         feeAddress = msg.sender;
     }
 
-    function _switch(
-        uint256 tokenId,
-        bool state
-    ) external onlyRole(W3BSTREAM_ROLE) {
+    function _switch(uint256 tokenId, bool state) external onlyRole(W3BSTREAM_ROLE) {
         STATES[tokenId].state = state;
         emit Switch(tokenId, state, block.timestamp, msg.sender);
     }
 
-    function _setFeeAddress(
-        address otherAddress
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function _setFeeAddress(address otherAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         feeAddress = otherAddress;
     }
 
@@ -52,24 +45,14 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
-        if (!DAI.transferFrom(msg.sender, address(this), amount))
-            revert TransferError();
+        if (!DAI.transferFrom(msg.sender, address(this), amount)) revert TransferError();
         uint256 fee = (amount * 3) / 1000;
         REVENUE[_ownerOf(tokenId)] = amount - fee;
         REVENUE[feeAddress] = fee;
-        emit Revenue(
-            tokenId,
-            amount,
-            tariffOf(tokenId),
-            msg.sender,
-            block.timestamp
-        );
+        emit Revenue(tokenId, amount, tariffOf(tokenId), msg.sender, block.timestamp);
     }
 
-    function claim(
-        uint256 amountOutMin,
-        uint256 deadline
-    ) external whenNotPaused {
+    function claim(uint256 amountOutMin, uint256 deadline) external whenNotPaused {
         uint256 amountIn = REVENUE[msg.sender];
         if (amountIn < 1) revert InputIsZero();
         if (!DAI.approve(address(MIMO), amountIn)) revert Unauthorized();
@@ -108,8 +91,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function _ownerOf(uint256 tokenId) internal view returns (address) {
-        return
-            ERC721(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b).ownerOf(tokenId); // TODO: add M3ter address
+        return ERC721(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b).ownerOf(tokenId); // TODO: add M3ter address
     }
 
     function _swapPath() internal pure returns (address[] memory) {
