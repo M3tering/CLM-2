@@ -89,11 +89,12 @@ contract M3tering is IM3tering, Pausable, AccessControl {
         uint256 deadline
     ) external whenNotPaused {
         uint256 amountIn = REVENUE[msg.sender];
-        require(amountIn > 0, "M3tering: no revenue to claim");
-        require(
-            DAI.approve(address(MIMO), amountIn),
-            "M3tering: failed to approve Mimo"
-        );
+        if (amountIn < 1) {
+            revert InputIsZero();
+        }
+        if (!DAI.approve(address(MIMO), amountIn)){
+            revert Unauthorized();
+        }
 
         MIMO.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn,
