@@ -10,8 +10,8 @@ import "./IMimo.sol";
 
 /// @custom:security-contact info@whynotswitch.com
 contract M3tering is IM3tering, Pausable, AccessControl {
-    mapping(uint256 => State) STATES;
-    mapping(address => uint256) REVENUE;
+    mapping(uint256 => State) public states;
+    mapping(address => uint256) public revenues;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -21,7 +21,6 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     IMimo public constant MIMO = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
     address public feeAddress;
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
@@ -30,7 +29,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function _switch(uint256 tokenId, bool state) external onlyRole(W3BSTREAM_ROLE) {
-        STATES[tokenId].state = state;
+        states[tokenId].state = state;
         emit Switch(tokenId, state, block.timestamp, msg.sender);
     }
 
@@ -41,22 +40,21 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     function _setTariff(uint256 tokenId, uint256 tariff) external {
         if (msg.sender != _ownerOf(tokenId)) revert Unauthorized();
         if (tariff < 1) revert InputIsZero();
-        STATES[tokenId].tariff = uint248(tariff);
+        states[tokenId].tariff = uint248(tariff);
     }
 
     function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
         if (!DAI.transferFrom(msg.sender, address(this), amount)) revert TransferError();
         uint256 fee = (amount * 3) / 1000;
-        REVENUE[_ownerOf(tokenId)] = amount - fee;
-        REVENUE[feeAddress] = fee;
+        revenues[_ownerOf(tokenId)] = amount - fee;
+        revenues[feeAddress] = fee;
         emit Revenue(tokenId, amount, tariffOf(tokenId), msg.sender, block.timestamp);
     }
 
     function claim(uint256 amountOutMin, uint256 deadline) external whenNotPaused {
-        uint256 amountIn = REVENUE[msg.sender];
+        uint256 amountIn = revenues[msg.sender];
         if (amountIn < 1) revert InputIsZero();
         if (!DAI.approve(address(MIMO), amountIn)) revert Unauthorized();
-
         MIMO.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn,
             amountOutMin,
@@ -64,17 +62,16 @@ contract M3tering is IM3tering, Pausable, AccessControl {
             msg.sender,
             deadline
         );
-
-        REVENUE[msg.sender] = 0;
+        revenues[msg.sender] = 0;
         emit Claim(msg.sender, amountIn, block.timestamp);
     }
 
     function revenueOf(address owner) external view returns (uint256[] memory) {
-        return (MIMO.getAmountsOut(REVENUE[owner], _swapPath()));
+        return (MIMO.getAmountsOut(revenues[owner], _swapPath()));
     }
 
     function stateOf(uint256 tokenId) external view returns (bool) {
-        return STATES[tokenId].state;
+        return states[tokenId].state;
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {
@@ -86,7 +83,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function tariffOf(uint256 tokenId) public view returns (uint256) {
-        uint256 tariff = STATES[tokenId].tariff;
+        uint256 tariff = states[tokenId].tariff;
         return tariff > 0 ? tariff : 1;
     }
 
