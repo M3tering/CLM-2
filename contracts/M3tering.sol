@@ -3,9 +3,10 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./IM3tering.sol";
-import "./ITokens.sol";
 import "./IMimo.sol";
 
 /// @custom:security-contact info@whynotswitch.com
@@ -17,7 +18,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
 
-    ERC20 public constant DAI = ERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
+    IERC20 public constant DAI = IERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
     IMimo public constant MIMO = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
     address public feeAddress;
 
@@ -88,7 +89,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function _ownerOf(uint256 tokenId) internal view returns (address) {
-        return ERC721(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b).ownerOf(tokenId); // TODO: add M3ter address
+        return IERC721(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b).ownerOf(tokenId); // TODO: add M3ter address
     }
 
     function _swapPath() internal pure returns (address[] memory) {
