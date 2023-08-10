@@ -2,9 +2,9 @@
 pragma solidity ^0.8.16;
 
 interface IM3tering {
-    error Unauthorized();
     error InputIsZero();
     error TransferError();
+    error ApprovalFailed();
 
     event Revenue(
         uint256 indexed tokenId,

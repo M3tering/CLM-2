@@ -39,7 +39,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function _setTariff(uint256 tokenId, uint256 tariff) external {
-        if (msg.sender != _ownerOf(tokenId)) revert Unauthorized();
+        if (msg.sender != _ownerOf(tokenId)) revert ApprovalFailed();
         if (tariff < 1) revert InputIsZero();
         states[tokenId].tariff = uint248(tariff);
     }
@@ -55,7 +55,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     function claim(uint256 amountOutMin, uint256 deadline) external whenNotPaused {
         uint256 amountIn = revenues[msg.sender];
         if (amountIn < 1) revert InputIsZero();
-        if (!DAI.approve(address(MIMO), amountIn)) revert Unauthorized();
+        if (!DAI.approve(address(MIMO), amountIn)) revert ApprovalFailed();
         MIMO.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn,
             amountOutMin,
