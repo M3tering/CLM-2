@@ -4,10 +4,9 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import "./DEX/DAI2SLX.sol";
 import "./IM3tering.sol";
-import "./IMimo.sol";
 
 /// @custom:security-contact info@whynotswitch.com
 contract M3tering is IM3tering, Pausable, AccessControl {
@@ -17,9 +16,6 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
-
-    IERC20 public constant DAI = IERC20(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // ioDAI
-    IMimo public constant MIMO = IMimo(0x147CdAe2BF7e809b9789aD0765899c06B361C5cE); // router
     address public feeAddress;
 
     constructor() {
@@ -39,13 +35,13 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function _setTariff(uint256 tokenId, uint256 tariff) external {
-        if (msg.sender != _ownerOf(tokenId)) revert ApprovalFailed();
+        if (msg.sender != _ownerOf(tokenId)) revert Unauthorized();
         if (tariff < 1) revert InputIsZero();
         states[tokenId].tariff = uint248(tariff);
     }
 
     function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
-        if (!DAI.transferFrom(msg.sender, address(this), amount)) revert TransferError();
+        DAI2SLX.depositDAI(amount);
         uint256 fee = (amount * 3) / 1000;
         revenues[_ownerOf(tokenId)] = amount - fee;
         revenues[feeAddress] = fee;
@@ -54,21 +50,7 @@ contract M3tering is IM3tering, Pausable, AccessControl {
 
     function claim(uint256 amountOutMin, uint256 deadline) external whenNotPaused {
         uint256 amountIn = revenues[msg.sender];
-        if (amountIn < 1) revert InputIsZero();
-        if (!DAI.approve(address(MIMO), amountIn)) revert ApprovalFailed();
-        MIMO.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            amountIn,
-            amountOutMin,
-            _swapPath(),
-            msg.sender,
-            deadline
-        );
-        revenues[msg.sender] = 0;
-        emit Claim(msg.sender, amountIn, block.timestamp);
-    }
-
-    function revenueOf(address owner) external view returns (uint256[] memory) {
-        return (MIMO.getAmountsOut(revenues[owner], _swapPath()));
+        DAI2SLX.claimSLX(amountIn, amountOutMin, deadline);
     }
 
     function stateOf(uint256 tokenId) external view returns (bool) {
@@ -90,12 +72,5 @@ contract M3tering is IM3tering, Pausable, AccessControl {
 
     function _ownerOf(uint256 tokenId) internal view returns (address) {
         return IERC721(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b).ownerOf(tokenId); // TODO: add M3ter address
-    }
-
-    function _swapPath() internal pure returns (address[] memory) {
-        address[] memory path = new address[](2);
-        path[0] = address(DAI);
-        path[1] = 0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b; // TODO: added DePIN token address
-        return path;
     }
 }
