@@ -49,8 +49,8 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     }
 
     function claim(uint256 amountOutMin, uint256 deadline) external whenNotPaused {
-        uint256 amountIn = revenues[msg.sender];
-        DAI2SLX.claimSLX(amountIn, amountOutMin, deadline);
+        DAI2SLX.claimSLX(revenues[msg.sender], amountOutMin, deadline);
+        revenues[msg.sender] = 0;
     }
 
     function stateOf(uint256 tokenId) external view returns (bool) {
