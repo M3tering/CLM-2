@@ -43,8 +43,8 @@ contract M3tering is IM3tering, Pausable, AccessControl {
     function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
         DAI2SLX.depositDAI(amount);
         uint256 fee = (amount * 3) / 1000;
-        revenues[_ownerOf(tokenId)] = amount - fee;
-        revenues[feeAddress] = fee;
+        revenues[_ownerOf(tokenId)] += amount - fee;
+        revenues[feeAddress] += fee;
         emit Revenue(tokenId, amount, tariffOf(tokenId), msg.sender, block.timestamp);
     }
 
