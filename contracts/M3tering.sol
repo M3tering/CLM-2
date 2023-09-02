@@ -41,16 +41,17 @@ contract M3tering_V1 is IM3tering, Pausable, AccessControl {
     }
 
     function pay(uint256 tokenId, uint256 amount) external whenNotPaused {
-        DAI2SLX.depositDAI(amount);
         uint256 fee = (amount * 3) / 1000;
-        revenues[_ownerOf(tokenId)] += amount - fee;
         revenues[feeAddress] += fee;
+        revenues[_ownerOf(tokenId)] += amount - fee;
+
+        DAI2SLX.depositDAI(amount);
         emit Revenue(tokenId, amount, tariffOf(tokenId), msg.sender, block.timestamp);
     }
 
     function claim(uint256 amountOutMin, uint256 deadline) external whenNotPaused {
-        DAI2SLX.claimSLX(revenues[msg.sender], amountOutMin, deadline);
         revenues[msg.sender] = 0;
+        DAI2SLX.claimSLX(revenues[msg.sender], amountOutMin, deadline);
     }
 
     function stateOf(uint256 tokenId) external view returns (bool) {
