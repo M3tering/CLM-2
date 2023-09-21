@@ -9,7 +9,7 @@ import "./DEX/DAI2SLX.sol";
 import "./IM3tering.sol";
 
 /// @custom:security-contact info@whynotswitch.com
-contract M3tering_V1 is IM3tering, Pausable, AccessControl {
+contract M3tering_V2 is IM3tering, Pausable, AccessControl {
     mapping(uint256 => State) public states;
     mapping(address => uint256) public revenues;
 
