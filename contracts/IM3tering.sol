@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 interface IM3tering {
     error InputIsZero();
+    error ZeroAddress();
     error Unauthorized();
 
     event Revenue(

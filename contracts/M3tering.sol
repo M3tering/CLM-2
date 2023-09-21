@@ -13,15 +13,18 @@ contract M3tering_V1 is IM3tering, Pausable, AccessControl {
     mapping(uint256 => State) public states;
     mapping(address => uint256) public revenues;
 
+    IERC721 public M3ter = IERC721(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b); // TODO: add M3ter address
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant W3BSTREAM_ROLE = keccak256("W3BSTREAM_ROLE");
     address public feeAddress;
 
     constructor() {
-        if (address(SLX) == address(0)) revert();
-        if (address(DAI) == address(0)) revert();
-        if (address(MIMO) == address(0)) revert();
+        if (address(SLX) == address(0)) revert ZeroAddress();
+        if (address(DAI) == address(0)) revert ZeroAddress();
+        if (address(MIMO) == address(0)) revert ZeroAddress();
+        if (address(M3ter) == address(0)) revert ZeroAddress();
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(W3BSTREAM_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -75,6 +78,6 @@ contract M3tering_V1 is IM3tering, Pausable, AccessControl {
     }
 
     function _ownerOf(uint256 tokenId) internal view returns (address) {
-        return IERC721(0x1CbAd85Aa66Ff3C12dc84C5881886EEB29C1bb9b).ownerOf(tokenId); // TODO: add M3ter address
+        return M3ter.ownerOf(tokenId);
     }
 }
