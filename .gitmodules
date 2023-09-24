@@ -1,3 +1,0 @@
-[submodule "contracts/DEX"]
-	path = contracts/DEX
-	url = git@github.com:M3tering/DAI2SLX.git
