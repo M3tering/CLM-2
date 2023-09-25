@@ -23,7 +23,7 @@ contract M3tering_V2 is IM3tering_V2, Protocol {
     ) external whenNotPaused {
         uint256 amountIn = revenues[msg.sender];
         if (amountIn < 1) revert InputIsZero();
-        if (!DAI.approve(address(MIMO), amountIn)) revert ApprovalFailed();
+        if (!DAI.approve(address(MIMO), amountIn)) revert Unauthorized();
         MIMO.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn,
             amountOutMin,
@@ -36,7 +36,7 @@ contract M3tering_V2 is IM3tering_V2, Protocol {
     }
 
     function estimateReward(address owner) external view returns (uint256) {
-        uint256[] estimates = MIMO.getAmountsOut(revenues[owner], _swapPath())
+        uint256[] memory estimates = MIMO.getAmountsOut(revenues[owner], _swapPath());
         return (estimates[1]);
     }
 
