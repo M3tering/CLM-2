@@ -7,6 +7,7 @@ import "./interfaces/IMimo.sol";
 
 /// @custom:security-contact info@whynotswitch.com
 contract Strategy_V2 is IStrategy {
+    error Unauthorized();
     error TransferError();
 
     IERC20 public constant SLX =
@@ -21,21 +22,20 @@ contract Strategy_V2 is IStrategy {
         address receiver,
         uint256 outputAmount
     ) public {
-        if (!DAI.transferFrom(msg.sender, receiver, revenueAmount))
+        if (!DAI.transferFrom(msg.sender, address(this), revenueAmount))
             revert TransferError();
+        if (!DAI.approve(address(MIMO), revenueAmount)) revert Unauthorized();
 
         address[] memory path = new address[](2);
         path[0] = address(DAI);
         path[1] = address(SLX);
-
-        // if (!DAI.approve(address(MIMO), revenueAmount)) revert Unauthorized();
 
         MIMO.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             revenueAmount,
             outputAmount,
             path,
             receiver,
-            type(uint256).max
+            block.timestamp
         );
     }
 }
