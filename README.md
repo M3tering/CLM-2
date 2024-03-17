@@ -1,1 +1,4 @@
-# M3tering Protocol V1
+# CLM-2 : Claim Logic Module for swapping xDAI to SLX on a DEX
+
+
+*work in progress...*

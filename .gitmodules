@@ -1,3 +1,0 @@
-[submodule "contracts/protocol-abc"]
-	path = contracts/protocol-abc
-	url = git@github.com:M3tering/Protocol-ABC.git
